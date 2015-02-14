@@ -5,9 +5,11 @@
  */
 package webserver;
 
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import javax.imageio.ImageIO;
 
 /**
  *
@@ -16,7 +18,8 @@ import java.util.*;
 public class WebServer extends Thread {
 
     private Socket cliente = null;		// representa la petición de nuestro cliente
-    private PrintWriter out = null;		// representa el buffer donde escribimos la respuesta
+    //  private PrintWriter out = null;		// representa el buffer donde escribimos la respuesta
+    DataOutputStream out;
 
     WebServer(Socket ps) {
         cliente = ps;
@@ -32,7 +35,8 @@ public class WebServer extends Thread {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(cliente.getInputStream()));
             //Tambien se pudo haber utilizado DataInputStream(recibir datos) y DataOutputStream (enviar datos)
-            out = new PrintWriter(new OutputStreamWriter(cliente.getOutputStream()));
+            out = new DataOutputStream(cliente.getOutputStream());
+            // out = new PrintWriter(new OutputStreamWriter(cliente.getOutputStream()));
 
             String linea = ""; // string para leer las lineas
             int i = 0;
@@ -61,13 +65,13 @@ public class WebServer extends Thread {
 
                         mostarPagina(st.nextToken());
                     } else {
-                        out.println("400 Petición Incorrecta");
+                        out.writeBytes("400 Petición Incorrecta");
                     }
                 }
 
             } while (linea != null && linea.length() != 0);
 
-        } catch (Exception e) {
+        } catch (Exception e) {            
             System.out.println(currentThread().toString() + " - " + "Error en servidor\n" + e.toString());
         }
 
@@ -93,34 +97,37 @@ public class WebServer extends Thread {
 
             if (mifichero.exists()) {
                 /* http response header */
-                out.println("HTTP/1.0 200 ok");
-                out.println("Date: " + new Date());
-                out.println("Content-Type: text/html");
-                out.println("Content-Length: " + mifichero.length());
-                out.println("\n");
+                // convert file to a byte array
+                int numOfBytes = (int) mifichero.length();
+                FileInputStream inFile = new FileInputStream(archivo);
+                byte[] fileInBytes = new byte[numOfBytes];
+                inFile.read(fileInBytes);
 
-                BufferedReader archivoLocal = new BufferedReader(new FileReader(mifichero));
-
-                String linea = "";
-
-                do {
-                    linea = archivoLocal.readLine();
-
-                    if (linea != null) {
-                        // sleep(500);
-                        out.println(linea);
-                    }
-                } while (linea != null);
+                out.writeBytes("HTTP/1.1 200 OK \r\n");
+                out.writeBytes("Date: " + new Date() + "\r\n");
+                
+                if (archivo.endsWith(".jpg")) {
+                    out.writeBytes("Content-Type: image/jpeg \r\n");
+                }else{
+                    if(archivo.endsWith(".css"))
+                        out.writeBytes("Content-Type: text/css \r\n");
+                    else
+                        out.writeBytes("Content-Type: text/html \r\n");
+                }
+                out.writeBytes("Content-Length: " + numOfBytes + "\r\n");
+                out.writeBytes("\r\n");
+                out.write(fileInBytes, 0, numOfBytes);
 
                 System.out.println("archivo procesado");
 
-                archivoLocal.close();
                 out.close();
+                inFile.close(); 
 
             } // fin de si el archivox existe 
             else {
                 System.out.println("Archivo " + mifichero.toString() + " no encontrado");
-                out.println("HTTP/1.0 400 ok");
+                out.writeBytes("HTTP/1.1 404 Not Found");
+                out.writeBytes("http://yoursite/nowhere");
                 out.close();
             }
 
